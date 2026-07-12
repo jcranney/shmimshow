@@ -33,10 +33,8 @@ impl State {
             .request_adapter(&wgpu::RequestAdapterOptions::default())
             .await
             .unwrap();
-        let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor::default())
-            .await
-            .unwrap();
+        let device_descriptor = wgpu::DeviceDescriptor::default();
+        let (device, queue) = adapter.request_device(&device_descriptor).await.unwrap();
 
         let size = window.inner_size();
 
@@ -293,8 +291,8 @@ impl ApplicationHandler for App {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
+    position: [f32; 2],
+    color: [f32; 1],
 }
 
 impl Vertex {
@@ -306,12 +304,12 @@ impl Vertex {
                 wgpu::VertexAttribute {
                     offset: 0,
                     shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32x2,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                     shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
+                    format: wgpu::VertexFormat::Float32,
                 },
             ],
         })
@@ -341,40 +339,45 @@ impl Rect {
         }
         for y in 0..size[0] {
             for x in 0..size[1] {
-                let color = [values[i] as f32 / 255.0, 0.0, 0.0];
-                let mut this_pixel_vertices = vec![];
-                this_pixel_vertices.push(Vertex {
-                    position: [
-                        (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x - 0.5 * pix_scale_x,
-                        (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y - 0.5 * pix_scale_y,
-                        0.0,
-                    ],
-                    color,
-                });
-                this_pixel_vertices.push(Vertex {
-                    position: [
-                        (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x - 0.5 * pix_scale_x,
-                        (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y + 0.5 * pix_scale_y,
-                        0.0,
-                    ],
-                    color,
-                });
-                this_pixel_vertices.push(Vertex {
-                    position: [
-                        (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x + 0.5 * pix_scale_x,
-                        (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y - 0.5 * pix_scale_y,
-                        0.0,
-                    ],
-                    color,
-                });
-                this_pixel_vertices.push(Vertex {
-                    position: [
-                        (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x + 0.5 * pix_scale_x,
-                        (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y + 0.5 * pix_scale_y,
-                        0.0,
-                    ],
-                    color,
-                });
+                let color = [values[i] as f32 / 255.0];
+                let mut this_pixel_vertices = vec![
+                    Vertex {
+                        position: [
+                            (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x
+                                - 0.5 * pix_scale_x,
+                            (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y
+                                - 0.5 * pix_scale_y,
+                        ],
+                        color,
+                    },
+                    Vertex {
+                        position: [
+                            (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x
+                                - 0.5 * pix_scale_x,
+                            (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y
+                                + 0.5 * pix_scale_y,
+                        ],
+                        color,
+                    },
+                    Vertex {
+                        position: [
+                            (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x
+                                + 0.5 * pix_scale_x,
+                            (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y
+                                - 0.5 * pix_scale_y,
+                        ],
+                        color,
+                    },
+                    Vertex {
+                        position: [
+                            (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x
+                                + 0.5 * pix_scale_x,
+                            (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y
+                                + 0.5 * pix_scale_y,
+                        ],
+                        color,
+                    },
+                ];
                 let offset = vertices.len() as u16;
                 indices.append(&mut vec![
                     offset,

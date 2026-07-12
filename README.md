@@ -14,8 +14,8 @@ application, with something like:
 shmimshow "<name>.im.shm"
 ```
 This is already the case with the packages listed above, but installation of
-those is a bit rough around the edges. If anyone knows of something as simple
-as I'm searching for, please reach out.
+those is a bit rough around the edges. If you're reading this, and you know
+of something as simple as I'm searching for, please reach out.
 
 ## Deep background (feel free to skip)
 Where to begin...
