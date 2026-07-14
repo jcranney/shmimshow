@@ -13,8 +13,8 @@ use winit::{
 # Performance
 In the current implementation, we get:
 200 x 200 | u8 | 60 FPS
-1000 x 1000 | u8 | 12 FPS
-2000 x 2000 | u8 | 5 FPS
+1000 x 1000 | u8 | 20 FPS
+2000 x 2000 | u8 | 9 FPS
 20000 x 20000 | u8 | Killed.
 */
 
@@ -351,9 +351,15 @@ impl Rect {
             pix_scale_x = 1.75 / size[1] as f32; // x-screen units per image spaxel
             pix_scale_y = pix_scale_x * resx / resy; // y-screen units per image spaxel
         }
-        for y in 0..size[0] {
-            for x in 0..size[1] {
-                let color = [values[i] as f32 / 255.0];
+        let size_x = size[1];
+        let size_y = size[0];
+        for y in 0..size_y + 1 {
+            for x in 0..size_x + 1 {
+                let color = if x == size_x || y == size_y {
+                    [0.0]
+                } else {
+                    [values[i] as f32 / 255.0]
+                };
                 let mut this_pixel_vertices = vec![
                     Vertex {
                         position: [
@@ -364,44 +370,20 @@ impl Rect {
                         ],
                         color,
                     },
-                    Vertex {
-                        position: [
-                            (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x
-                                - 0.5 * pix_scale_x,
-                            (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y
-                                + 0.5 * pix_scale_y,
-                        ],
-                        color,
-                    },
-                    Vertex {
-                        position: [
-                            (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x
-                                + 0.5 * pix_scale_x,
-                            (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y
-                                - 0.5 * pix_scale_y,
-                        ],
-                        color,
-                    },
-                    Vertex {
-                        position: [
-                            (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x
-                                + 0.5 * pix_scale_x,
-                            (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y
-                                + 0.5 * pix_scale_y,
-                        ],
-                        color,
-                    },
                 ];
-                let offset = vertices.len() as u32;
+                vertices.append(&mut this_pixel_vertices);
+                if x == size_x || y == size_y {
+                    continue;
+                }
+                let offset = vertices.len() as u32 - 1;
                 indices.append(&mut vec![
                     offset,
-                    offset + 2,
                     offset + 1,
-                    offset + 1,
-                    offset + 2,
-                    offset + 3,
+                    offset + size_x + 2,
+                    offset,
+                    offset + size_x + 2,
+                    offset + size_x + 1,
                 ]);
-                vertices.append(&mut this_pixel_vertices);
                 i += 1;
             }
         }
