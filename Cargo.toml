@@ -4,12 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-risio = {version = "0.1.9", default-features = false}
+risio = {version = "0.1.11", default-features = false}
 winit = { version = "0.30", features = ["android-native-activity"] }
 env_logger = "0.11.11"
 wgpu = "30.0.0"
 pollster = "1.0.1"
 bytemuck = { version = "1.25.1", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]

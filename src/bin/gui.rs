@@ -1,7 +1,16 @@
 use shmimshow::App;
 use winit::event_loop::{ControlFlow, EventLoop};
+use clap::Parser;
+
+#[derive(Parser)]
+struct Args {
+    /// shared memory name /dev/shm/<name>.im.shm
+    name: String,
+}
 
 fn main() {
+    let args = Args::parse();
+    let mut app = App::new(&args.name);
     // wgpu uses `log` for all of our logging, so we initialize a logger with the `env_logger` crate.
     //
     // To change the log level, set the `RUST_LOG` environment variable. See the `env_logger`
@@ -22,6 +31,5 @@ fn main() {
     // the background.
     // event_loop.set_control_flow(ControlFlow::Wait);
 
-    let mut app = App::default();
     event_loop.run_app(&mut app).unwrap();
 }

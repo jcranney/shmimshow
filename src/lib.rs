@@ -35,7 +35,7 @@ struct State {
 }
 
 impl State {
-    async fn new(display: OwnedDisplayHandle, window: Arc<Window>) -> State {
+    async fn new(display: OwnedDisplayHandle, window: Arc<Window>, shm_name: String) -> Self {
         let previous_time = Instant::now();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_with_display_handle(
             Box::new(display),
@@ -103,9 +103,7 @@ impl State {
         });
 
         let rect = Rect {
-            image: RawImage::create_new("bob", &[3, 5])
-                .or_else(|_| RawImage::open("bob"))
-                .unwrap(),
+            image: RawImage::open(&shm_name).unwrap(),
         };
 
         let (vertices, indices) = rect.get_vertices_and_indices(100.0, 100.0);
@@ -136,7 +134,7 @@ impl State {
             index_buffer,
             num_indices,
             rect,
-            previous_time
+            previous_time,
         };
 
         // Configure surface for the first time
@@ -256,12 +254,21 @@ impl State {
     }
 }
 
-#[derive(Default)]
 pub struct App {
     state: Option<State>,
+    shm_name: String,
 }
 
-impl ApplicationHandler for App {
+impl App {
+    pub fn new(shm_name: &str) -> Self {
+        Self {
+            state: None,
+            shm_name: shm_name.to_string(),
+        }
+    }
+}
+
+impl<'a> ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // Create window object
         let window = Arc::new(
@@ -273,6 +280,7 @@ impl ApplicationHandler for App {
         let state = pollster::block_on(State::new(
             event_loop.owned_display_handle(),
             window.clone(),
+            self.shm_name.clone(),
         ));
         self.state = Some(state);
 
@@ -360,17 +368,13 @@ impl Rect {
                 } else {
                     [values[i] as f32 / 255.0]
                 };
-                let mut this_pixel_vertices = vec![
-                    Vertex {
-                        position: [
-                            (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x
-                                - 0.5 * pix_scale_x,
-                            (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y
-                                - 0.5 * pix_scale_y,
-                        ],
-                        color,
-                    },
-                ];
+                let mut this_pixel_vertices = vec![Vertex {
+                    position: [
+                        (x as f32 - (size[1] as f32) * 0.5 + 0.5) * pix_scale_x - 0.5 * pix_scale_x,
+                        (y as f32 - (size[0] as f32) * 0.5 + 0.5) * pix_scale_y - 0.5 * pix_scale_y,
+                    ],
+                    color,
+                }];
                 vertices.append(&mut this_pixel_vertices);
                 if x == size_x || y == size_y {
                     continue;

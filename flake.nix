@@ -40,7 +40,7 @@
             # My tools:
             shmim-tools.packages.${system}.default
           ];
-          RUST_LOG = "debug";
+          # RUST_LOG = "debug";
           LD_LIBRARY_PATH = libPath;
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
         };
