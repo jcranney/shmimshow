@@ -1,5 +1,5 @@
 use risio::{Accessor, RawImage};
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use wgpu::util::DeviceExt;
 
 use winit::{
@@ -8,6 +8,15 @@ use winit::{
     event_loop::{ActiveEventLoop, OwnedDisplayHandle},
     window::{Window, WindowId},
 };
+
+/*
+# Performance
+In the current implementation, we get:
+200 x 200 | u8 | 60 FPS
+1000 x 1000 | u8 | 12 FPS
+2000 x 2000 | u8 | 5 FPS
+20000 x 20000 | u8 | Killed.
+*/
 
 struct State {
     instance: wgpu::Instance,
@@ -22,10 +31,12 @@ struct State {
     index_buffer: wgpu::Buffer,
     num_indices: u32,
     rect: Rect,
+    previous_time: Instant,
 }
 
 impl State {
     async fn new(display: OwnedDisplayHandle, window: Arc<Window>) -> State {
+        let previous_time = Instant::now();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_with_display_handle(
             Box::new(display),
         ));
@@ -125,6 +136,7 @@ impl State {
             index_buffer,
             num_indices,
             rect,
+            previous_time
         };
 
         // Configure surface for the first time
@@ -231,7 +243,7 @@ impl State {
         //     .write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&v));
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16); // 1.
+        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32); // 1.
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1); // 2.
         drop(render_pass);
 
@@ -239,6 +251,8 @@ impl State {
         self.queue.submit([encoder.finish()]);
         self.window.pre_present_notify();
         self.queue.present(surface_texture);
+        println!("{} FPS", 1.0 / self.previous_time.elapsed().as_secs_f64());
+        self.previous_time = Instant::now();
     }
 }
 
@@ -322,9 +336,9 @@ struct Rect {
 
 // let's assume that the image has only 2 dimensions for now.
 impl Rect {
-    fn get_vertices_and_indices(&self, resx: f32, resy: f32) -> (Vec<Vertex>, Vec<u16>) {
+    fn get_vertices_and_indices(&self, resx: f32, resy: f32) -> (Vec<Vertex>, Vec<u32>) {
         let mut vertices = vec![];
-        let mut indices: Vec<u16> = vec![];
+        let mut indices = vec![];
         let size = self.image.metadata().size;
         let mut i = 0;
         let values = unsafe { self.image.array() };
@@ -378,7 +392,7 @@ impl Rect {
                         color,
                     },
                 ];
-                let offset = vertices.len() as u16;
+                let offset = vertices.len() as u32;
                 indices.append(&mut vec![
                     offset,
                     offset + 2,
