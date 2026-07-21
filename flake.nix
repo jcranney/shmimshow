@@ -19,25 +19,25 @@
         ];
       in
       {
-        defaultPackage = naersk-lib.buildPackage ./.;
+        packages = rec {
+          shmimshow = pkgs.stdenv.mkDerivation {
+            buildInputs = with pkgs; [
+              cargo rustc rustfmt pre-commit rustPackages.clippy
+              wasm-pack 
+            ];
+            name = "shmimshow";
+            src = ./.;
+            buildPhase = ''
+              cargo build --release --bin shmimshow
+              cp ./target/release $out
+            '';
+          };
+          default = shmimshow;
+        };
         devShell = with pkgs; mkShell {
           buildInputs = [ 
-            # default rust flake:
             cargo rustc rustfmt pre-commit rustPackages.clippy
-            # wgpu
-            wasm-pack # wayland pkg-config
-            # pkg-config
-            # vulkan-headers
-            # vulkan-loader
-            # vulkan-tools
-            # gtk specific:
-            # pkg-config gtk4
-            ## The gtk-rs docs say that I'll need these, but I won't include
-            ## them until I hit errors, because I guess some of them are
-            ## included in the gtk4 package anyway.
-            # libadwaita meson desktop-file-utils gcc glib desktop-file-utils
-            
-            # My tools:
+            wasm-pack
             shmim-tools.packages.${system}.default
           ];
           # RUST_LOG = "debug";

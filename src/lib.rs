@@ -1,4 +1,4 @@
-use risio::{Accessor, RawImage};
+use risio::{Accessor, ShmImage};
 use std::{sync::Arc, time::Instant};
 use wgpu::util::DeviceExt;
 
@@ -103,7 +103,7 @@ impl State {
         });
 
         let rect = Rect {
-            image: RawImage::open(&shm_name).unwrap(),
+            image: ShmImage::open(&shm_name).unwrap(),
         };
 
         let (vertices, indices) = rect.get_vertices_and_indices(100.0, 100.0);
@@ -339,7 +339,7 @@ impl Vertex {
 }
 
 struct Rect {
-    image: RawImage<'static, u8>,
+    image: ShmImage<'static, u8>,
 }
 
 // let's assume that the image has only 2 dimensions for now.
