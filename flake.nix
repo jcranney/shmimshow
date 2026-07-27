@@ -3,10 +3,9 @@
     naersk.url = "github:nix-community/naersk/master";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     utils.url = "github:numtide/flake-utils";
-    shmim-tools.url = "github:jcranney/shmim-tools";
   };
 
-  outputs = { self, nixpkgs, utils, naersk, shmim-tools }:
+  outputs = { self, nixpkgs, utils, naersk }:
     utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
@@ -38,7 +37,7 @@
           buildInputs = [ 
             cargo rustc rustfmt pre-commit rustPackages.clippy
             wasm-pack
-            shmim-tools.packages.${system}.default
+            # shmim-tools.packages.${system}.default
           ];
           # RUST_LOG = "debug";
           LD_LIBRARY_PATH = libPath;

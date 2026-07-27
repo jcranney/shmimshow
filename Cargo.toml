@@ -4,7 +4,7 @@ version = "0.1.2"
 edition = "2024"
 
 [dependencies]
-risio = { version = "0.2.1", default-features = false }
+risio = { version = "0.2.2", default-features = false }
 winit = { version = "0.30.13", default-features = false, features = [
     "rwh_06",
     "x11",
@@ -17,9 +17,10 @@ wgpu = "30.0.0"
 pollster = "1.0.1"
 bytemuck = { version = "1.25.2", features = ["derive"] }
 clap = { version = "4.6.3", features = ["derive"] }
+anyhow = "1.0.104"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+# [lib]
+# crate-type = ["cdylib", "rlib"]
 
 [profile.release]
 strip = true

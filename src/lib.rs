@@ -1,4 +1,4 @@
-use risio::{Accessor, ShmImage};
+use risio::{Accessor, ShmImage, datatype::IsioDataType};
 use std::{sync::Arc, time::Instant};
 use wgpu::util::DeviceExt;
 
@@ -18,7 +18,7 @@ In the current implementation, we get:
 20000 x 20000 | u8 | Killed.
 */
 
-struct State {
+struct State<'a, T: IsioDataType + Normalisable + Copy> {
     instance: wgpu::Instance,
     window: Arc<Window>,
     device: wgpu::Device,
@@ -30,12 +30,14 @@ struct State {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
-    rect: Rect,
+    rect: Rect<'a, T>,
     previous_time: Instant,
+    fps_avg: f64,
+    frame_cnt: usize,
 }
 
-impl State {
-    async fn new(display: OwnedDisplayHandle, window: Arc<Window>, shm_name: String) -> Self {
+impl<'a, T: Normalisable> State<'a, T> {
+    async fn new(display: OwnedDisplayHandle, window: Arc<Window>, rect: Rect<'a, T>) -> Self {
         let previous_time = Instant::now();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_with_display_handle(
             Box::new(display),
@@ -102,10 +104,6 @@ impl State {
             cache: None,
         });
 
-        let rect = Rect {
-            image: ShmImage::open(&shm_name).unwrap(),
-        };
-
         let (vertices, indices) = rect.get_vertices_and_indices(100.0, 100.0);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -135,6 +133,8 @@ impl State {
             num_indices,
             rect,
             previous_time,
+            fps_avg: 0.0,
+            frame_cnt: 0,
         };
 
         // Configure surface for the first time
@@ -171,6 +171,7 @@ impl State {
     }
 
     fn render(&mut self) {
+        self.frame_cnt += 1;
         // Create texture view.
         // NOTE: We must handle Timeout because the surface may be unavailable
         // (e.g., when the window is occluded on macOS).
@@ -249,26 +250,31 @@ impl State {
         self.queue.submit([encoder.finish()]);
         self.window.pre_present_notify();
         self.queue.present(surface_texture);
-        println!("{} FPS", 1.0 / self.previous_time.elapsed().as_secs_f64());
+        let ewma_gain = 0.1;
+        self.fps_avg = self.fps_avg * (1.0 - ewma_gain)
+            + ewma_gain * (1.0 / self.previous_time.elapsed().as_secs_f64());
+        if self.frame_cnt % 60 == 0 {
+            println!("{} FPS", self.fps_avg);
+        }
         self.previous_time = Instant::now();
     }
 }
 
-pub struct App {
-    state: Option<State>,
-    shm_name: String,
+pub struct App<'a, T: Normalisable> {
+    state: Option<State<'a, T>>,
+    rect: Option<Rect<'a, T>>, // image starts in App, but then moves to State
 }
 
-impl App {
-    pub fn new(shm_name: &str) -> Self {
+impl<'a, T: Normalisable> App<'a, T> {
+    pub fn new(rect: Rect<'a, T>) -> Self {
         Self {
             state: None,
-            shm_name: shm_name.to_string(),
+            rect: Some(rect),
         }
     }
 }
 
-impl<'a> ApplicationHandler for App {
+impl<'a, T: Normalisable> ApplicationHandler for App<'a, T> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         // Create window object
         let window = Arc::new(
@@ -280,7 +286,7 @@ impl<'a> ApplicationHandler for App {
         let state = pollster::block_on(State::new(
             event_loop.owned_display_handle(),
             window.clone(),
-            self.shm_name.clone(),
+            self.rect.take().unwrap(),
         ));
         self.state = Some(state);
 
@@ -338,12 +344,31 @@ impl Vertex {
     }
 }
 
-struct Rect {
-    image: ShmImage<'static, u8>,
+pub struct Rect<'a, T: Normalisable> {
+    image: ShmImage<'a, T>,
+    cmin: Option<f32>,
+    cmax: Option<f32>,
 }
 
 // let's assume that the image has only 2 dimensions for now.
-impl Rect {
+impl<'a, T: Normalisable> Rect<'a, T> {
+    pub fn new(name: &str) -> Result<Self, risio::error::Error> {
+        Ok(Self {
+            image: risio::ShmImage::<T>::open(name)?,
+            cmin: None,
+            cmax: None,
+        })
+    }
+
+    pub fn cmin(&mut self, cmin: Option<f32>) -> &mut Self {
+        self.cmin = cmin;
+        self
+    }
+    pub fn cmax(&mut self, cmax: Option<f32>) -> &mut Self {
+        self.cmax = cmax;
+        self
+    }
+
     fn get_vertices_and_indices(&self, resx: f32, resy: f32) -> (Vec<Vertex>, Vec<u32>) {
         let mut vertices = vec![];
         let mut indices = vec![];
@@ -361,12 +386,34 @@ impl Rect {
         }
         let size_x = size[1];
         let size_y = size[0];
+        let min: f32 = match self.cmin {
+            None => values
+                .iter()
+                .reduce(|a, b| match a < b {
+                    true => a,
+                    false => b,
+                })
+                .unwrap()
+                .as_f32(),
+            Some(x) => x,
+        };
+        let max: f32 = match self.cmax {
+            None => values
+            .iter()
+            .reduce(|a, b| match a > b {
+                true => a,
+                false => b,
+            })
+            .unwrap()
+            .as_f32(),
+            Some(x) => x,
+        };
         for y in 0..size_y + 1 {
             for x in 0..size_x + 1 {
                 let color = if x == size_x || y == size_y {
                     [0.0]
                 } else {
-                    [values[i] as f32 / 255.0]
+                    [T::normalise(values[i], min.as_f32(), max.as_f32())]
                 };
                 let mut this_pixel_vertices = vec![Vertex {
                     position: [
@@ -392,5 +439,67 @@ impl Rect {
             }
         }
         (vertices, indices)
+    }
+}
+
+pub trait Normalisable: IsioDataType + PartialOrd + Copy {
+    fn as_f32(self) -> f32;
+
+    /// take a sample and convert it to an f32 in the range of 0 to 1.
+    fn normalise(self, min: f32, max: f32) -> f32 {
+        (self.as_f32() - min) / (max - min)
+    }
+}
+
+impl Normalisable for u8 {
+    fn as_f32(self) -> f32 {
+        self as f32
+    }
+}
+
+impl Normalisable for u16 {
+    fn as_f32(self) -> f32 {
+        self as f32
+    }
+}
+impl Normalisable for u32 {
+    fn as_f32(self) -> f32 {
+        self as f32
+    }
+}
+impl Normalisable for u64 {
+    fn as_f32(self) -> f32 {
+        self as f32
+    }
+}
+impl Normalisable for i8 {
+    fn as_f32(self) -> f32 {
+        self as f32
+    }
+}
+impl Normalisable for i16 {
+    fn as_f32(self) -> f32 {
+        self as f32
+    }
+}
+impl Normalisable for i32 {
+    fn as_f32(self) -> f32 {
+        self as f32
+    }
+}
+impl Normalisable for i64 {
+    fn as_f32(self) -> f32 {
+        self as f32
+    }
+}
+
+impl Normalisable for f32 {
+    fn as_f32(self) -> f32 {
+        self as f32
+    }
+}
+impl Normalisable for f64 {
+    fn as_f32(self) -> f32 {
+        self as f32
     }
 }
