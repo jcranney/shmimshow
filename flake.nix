@@ -1,47 +1,37 @@
 {
   inputs = {
-    naersk.url = "github:nix-community/naersk/master";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     utils.url = "github:numtide/flake-utils";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, utils, naersk }:
+  outputs = { self, nixpkgs, utils, fenix, naersk }:
     utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        naersk-lib = pkgs.callPackage naersk { };
-        libPath = with pkgs; lib.makeLibraryPath [
-          libGL
-          libxkbcommon
-          wayland
-          vulkan-loader
+        toolchain = with fenix.packages.${system}; combine [
+          minimal.cargo
+          minimal.rustc
         ];
       in
       {
-        packages = rec {
-          shmimshow = pkgs.stdenv.mkDerivation {
-            buildInputs = with pkgs; [
-              cargo rustc rustfmt pre-commit rustPackages.clippy
-              wasm-pack 
-            ];
-            name = "shmimshow";
-            src = ./.;
-            buildPhase = ''
-              cargo build --release --bin shmimshow
-              cp ./target/release $out
-            '';
-          };
-          default = shmimshow;
+        packages.default = (naersk.lib.${system}.override {
+          cargo = toolchain;
+          rustc = toolchain;
+        }).buildPackage {
+          src = ./.;
         };
         devShell = with pkgs; mkShell {
-          buildInputs = [ 
-            cargo rustc rustfmt pre-commit rustPackages.clippy
-            wasm-pack
-            # shmim-tools.packages.${system}.default
+          nativeBuildInputs = [
+              fenix.packages.${system}.complete.toolchain
           ];
-          # RUST_LOG = "debug";
-          LD_LIBRARY_PATH = libPath;
-          RUST_SRC_PATH = rustPlatform.rustLibSrc;
         };
       }
     );

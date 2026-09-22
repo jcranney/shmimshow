@@ -1,6 +1,6 @@
 [package]
 name = "shmimshow"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 
 [dependencies]
@@ -13,10 +13,10 @@ winit = { version = "0.30.13", default-features = false, features = [
     "wayland-csd-adwaita",
 ] }
 env_logger = "0.11.11"
-wgpu = "30.0.0"
+wgpu = "30.0.1"
 pollster = "1.0.1"
 bytemuck = { version = "1.25.2", features = ["derive"] }
-clap = { version = "4.6.3", features = ["derive"] }
+clap = { version = "4.6.7", features = ["derive"] }
 anyhow = "1.0.104"
 
 # [lib]
